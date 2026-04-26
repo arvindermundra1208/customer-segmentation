@@ -115,7 +115,7 @@ scipy
 ## Documentation
 
 - **Jupyter Notebook**: `customer segementation.ipynb` - Complete analysis with code, visualizations, and detailed commentary
-- **PDF Report**: `STAT654_Final_Report.pdf` - Comprehensive written report with methodology, results, and conclusions
+- **PDF Report**: `report.pdf` - Comprehensive written report with methodology, results, and conclusions
 
 ## Project Status
 
