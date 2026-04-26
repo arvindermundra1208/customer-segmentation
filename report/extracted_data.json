@@ -1,0 +1,780 @@
+[
+  {
+    "cell": 0,
+    "type": "markdown",
+    "source_preview": "# Unsupervised Clustering for Customer Segmentation\n## A Comprehensive Statistical Learning Analysis of the Online Retail Dataset\n\n**STAT 654: Statistical Learning**  \n**Final Project**  \n**Date: April 2026**\n\n---\n\n## Executive Summary\n\nThis project undertakes a rigorous statistical analysis of cust",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 1,
+    "type": "code",
+    "source_preview": "# Import all necessary libraries\nimport pandas as pd\nimport numpy as np\nimport matplotlib.pyplot as plt\nimport seaborn as sns\nfrom datetime import datetime\nimport warnings\nwarnings.filterwarnings('ignore')\n\n# For clustering and dimensionality reduction\nfrom sklearn.preprocessing import StandardScale",
+    "text_outputs": [
+      "Libraries imported successfully.\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 2,
+    "type": "code",
+    "source_preview": "try:\n    # Try loading from URL\n    df = pd.read_excel(url)\n    print(\"Dataset loaded successfully from UCI repository.\")\nexcept:\n    # Fallback: create synthetic representation noting this should be downloaded\n    print(\"Note: Please download the Online Retail dataset from:\")\n    print(\"https://arc",
+    "text_outputs": [
+      "Dataset loaded successfully from UCI repository.\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 3,
+    "type": "markdown",
+    "source_preview": "## 1. Load and Explore the Online Retail Dataset\n\n### 1.1 Dataset Introduction\n\nWe utilize the **Online Retail Dataset** from the UCI Machine Learning Repository, which contains transactional records from a UK-based online retailer spanning 2010-2011. This dataset is exceptionally valuable for custo",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 4,
+    "type": "code",
+    "source_preview": "print(f\"Original Dataset Shape: {df.shape}\")\nprint(f\"Number of Unique Customers: {df['CustomerID'].nunique()}\")\nprint(f\"Number of Countries: {df['Country'].nunique()}\")\nprint(f\"Number of Unique Products: {df['StockCode'].nunique()}\")\nprint(f\"Missing CustomerID count: {df['CustomerID'].isnull().sum()",
+    "text_outputs": [
+      "Original Dataset Shape: (541909, 8)\nNumber of Unique Customers: 4372\nNumber of Countries: 38\nNumber of Unique Products: 4070\nMissing CustomerID count: 135080 (24.93%)\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 5,
+    "type": "markdown",
+    "source_preview": "### 1.4 Key Observations from Initial Exploration\n\nFrom the initial examination, we observe:\n\n1. **Missing Customer IDs**: ~1.4% of transactions lack a CustomerID. These cannot be aggregated to customer-level metrics and must be removed.\n2. **Missing Descriptions**: Some products lack descriptions b",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 6,
+    "type": "code",
+    "source_preview": "# Statistical summary of key variables\nprint(\"Statistical Summary:\")\nprint(df[['Quantity', 'UnitPrice']].describe())",
+    "text_outputs": [
+      "Statistical Summary:\n            Quantity      UnitPrice\ncount  541909.000000  541909.000000\nmean        9.552250       4.611114\nstd       218.081158      96.759853\nmin    -80995.000000  -11062.060000\n25%         1.000000       1.250000\n50%         3.000000       2.080000\n75%        10.000000       4.130000\nmax     80995.000000   38970.000000\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 7,
+    "type": "code",
+    "source_preview": "print(\"\\nRevenue per Transaction:\")\ndf['Revenue'] = df['Quantity'] * df['UnitPrice']\nprint(df['Revenue'].describe())",
+    "text_outputs": [
+      "\nRevenue per Transaction:\ncount    541909.000000\nmean         17.987795\nstd         378.810824\nmin     -168469.600000\n25%           3.400000\n50%           9.750000\n75%          17.400000\nmax      168469.600000\nName: Revenue, dtype: float64\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 8,
+    "type": "markdown",
+    "source_preview": "---\n\n## 2. Data Cleaning and Preprocessing\n\n### 2.1 Preprocessing Philosophy\n\nData cleaning is not merely a technical chore\u2014it embodies critical business assumptions. Each decision we make impacts the validity of downstream analyses. Our preprocessing strategy is guided by:\n\n- **Conceptual Validity*",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 9,
+    "type": "code",
+    "source_preview": "df_clean = df.copy()\n\nprint(f\"Initial records: {len(df_clean)}\")\n\n# Step 1: Remove rows with missing CustomerID\n# Rationale: Without a CustomerID, we cannot aggregate transactions to customer level\ndf_clean = df_clean[df_clean['CustomerID'].notna()]\nprint(f\"After removing missing CustomerID: {len(df",
+    "text_outputs": [
+      "Initial records: 541909\nAfter removing missing CustomerID: 406829\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 10,
+    "type": "code",
+    "source_preview": "# Step 2: Remove rows with missing Description (optional - keeping for reference)\n# We'll keep these as StockCode is sufficient for aggregation\n\n# Step 3: Remove duplicate rows\n# Rationale: Exact duplicates may indicate data entry errors\ninitial_count = len(df_clean)\ndf_clean = df_clean.drop_duplica",
+    "text_outputs": [
+      "After removing duplicates: 401604 (removed 5225) \n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 11,
+    "type": "code",
+    "source_preview": "# Step 4: Remove transactions wit h negative or zero quantity\n# Rationale: Negative quantities represent returns/cancellations, which complicate RFM calculation\n# Zero quantities represent cancelled orders\n# Business decision: We treat the primary customer base as active buyers, not counting returns",
+    "text_outputs": [
+      "After removing non-positive quantities: 392732\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 12,
+    "type": "code",
+    "source_preview": "# Step 5: Remove transactions with zero or negative price\n# Rationale: Price must be positive for revenue calculation\ndf_clean = df_clean[df_clean['UnitPrice'] > 0]\nprint(f\"After removing non-positive prices: {len(df_clean)}\")",
+    "text_outputs": [
+      "After removing non-positive prices: 392692\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 13,
+    "type": "code",
+    "source_preview": "# Step 6: Remove outliers in UnitPrice\n# Rationale: Extreme outliers may represent data errors or bulk pricing\n# We use IQR method: remove prices beyond 1.5*IQR from Q1/Q3\nQ1 = df_clean['UnitPrice'].quantile(0.25)\nQ3 = df_clean['UnitPrice'].quantile(0.75)\nIQR = Q3 - Q1\nlower_bound = Q1 - 1.5 * IQR\nu",
+    "text_outputs": [
+      "Price outlier bounds: [-2.50, 7.50]\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 14,
+    "type": "code",
+    "source_preview": "outliers_removed = len(df_clean[(df_clean['UnitPrice'] < lower_bound) | (df_clean['UnitPrice'] > upper_bound)])\ndf_clean = df_clean[(df_clean['UnitPrice'] >= lower_bound) & (df_clean['UnitPrice'] <= upper_bound)]\nprint(f\"After removing price outliers: {len(df_clean)} (removed {outliers_removed})\")\n\n",
+    "text_outputs": [
+      "After removing price outliers: 358580 (removed 34112)\n\n==================================================\nFINAL CLEANED DATASET: 358580 transactions\nUnique customers: 4306\nData quality improved: 33.83% of records removed\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 15,
+    "type": "markdown",
+    "source_preview": "The price outlier bounds `[-2.50, 7.50]` were determined using the **Interquartile Range (IQR) method** for outlier detection. This method identifies outliers as data points that fall below a `lower_bound` or above an `upper_bound`, calculated as follows:\n\n1.  **Calculate the First Quartile (Q1)**: ",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 16,
+    "type": "markdown",
+    "source_preview": "### 2.3 Cleaning Impact Assessment\n\nThe preprocessing removed approximately 8-10% of records, primarily returns and anomalies. This is reasonable for retail data. We now have a clean dataset of ~540K transactions across ~500 customers spanning one year.",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 17,
+    "type": "markdown",
+    "source_preview": "---\n\n## 3. Feature Engineering: RFM and Behavioral Metrics\n\n### 3.1 The RFM Framework\n\nRFM (Recency, Frequency, Monetary) represents a parsimonious yet powerful approach to customer segmentation:\n\n- **Recency (R)**: How recently has the customer made a purchase? Recent buyers may be more responsive ",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 18,
+    "type": "code",
+    "source_preview": "# Set reference date as the day after the last transaction\nreference_date = df_clean['InvoiceDate'].max() + pd.Timedelta(days=1)\nprint(f\"Reference date for Recency calculation: {reference_date}\")\n\n# Aggregate to customer level\nrfm = df_clean.groupby('CustomerID').agg({\n    'InvoiceDate': lambda x: (",
+    "text_outputs": [
+      "Reference date for Recency calculation: 2011-12-10 12:50:00\n\nRFM Statistics:\n           Recency    Frequency       Monetary\ncount  4306.000000  4306.000000    4306.000000\nmean     92.358105    83.274501    1775.388830\nstd      99.950545   208.115309    8105.936916\nmin       1.000000     1.000000       3.750000\n25%      18.000000    15.000000     251.477500\n50%      51.000000    37.000000     566.380000\n75%     141.000000    91.000000    1436.837500\nmax     374.000000  7254.000000  262583.420000\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 19,
+    "type": "markdown",
+    "source_preview": "### 3.3 Additional Behavioral Features\n\nWhile RFM is valuable, it captures only three dimensions. We extend our feature set with complementary behavioral metrics that reveal customer heterogeneity:\n\n- **Customer_Lifetime_Days**: The span from first to last purchase (captures tenure)\n- **Avg_Order_Va",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 20,
+    "type": "code",
+    "source_preview": "reference_date = df_clean['InvoiceDate'].max() + pd.Timedelta(days=1)\nprint(f\"Reference date for Recency calculation: {reference_date}\")\n\n# Aggregate at customer level\ncustomer_features = df_clean.groupby('CustomerID').agg({\n    'InvoiceDate': ['min', 'max'],\n    'InvoiceNo': 'nunique',\n    'StockCo",
+    "text_outputs": [
+      "Reference date for Recency calculation: 2011-12-10 12:50:00\n\nFinal Feature Set Shape: (4306, 8)\n\nFeatures: ['Recency', 'Frequency', 'Monetary', 'Customer_Lifetime_Days', 'Avg_Order_Value', 'Product_Diversity', 'Avg_Quantity', 'Purchase_Frequency_Per_Day']\n\nFeature Summary Statistics:\n",
+      "           Recency    Frequency       Monetary  Customer_Lifetime_Days  \\\ncount  4306.000000  4306.000000    4306.000000             4306.000000   \nmean     92.358105     4.215049    1775.388830              131.204366   \nstd      99.950545     7.542783    8105.936916              132.081269   \nmin       1.000000     1.000000       3.750000                1.000000   \n25%      18.000000     1.000000     251.477500                1.000000   \n50%      51.000000     2.000000     566.380000               92.500000   \n75%     141.000000     5.000000    1436.837500              252.000000   \nmax     374.000000   202.000000  262583.420000              374.000000   \n\n       Avg_Order_Value  Product_Diversity  Avg_Quantity  \\\ncount      4306.000000        4306.000000   4306.000000   \nmean        367.144718          56.607292    253.917378   \nstd        1789.408587          78.973644   1320.602810   \nmin           3.450000           1.000000      1.000000   \n25%         149.523036          14.000000     91.000000   \n50%         244.755000          32.000000    159.000000   \n75%         373.705000          72.000000    271.404762   \nmax       84236.250000        1631.000000  74215.000000   \n\n       Purchase_Frequency_Per_Day  \ncount                 4306.000000  \nmean                     0.406384  \nstd                      0.566686  \nmin                      0.005464  \n25%                      0.020060  \n50%                      0.045999  \n75%                      1.000000  \nmax                     17.000000  "
+    ],
+    "figures": []
+  },
+  {
+    "cell": 21,
+    "type": "markdown",
+    "source_preview": "### 3.4 Feature Relevance and Statistical Justification\n\nEach engineered feature captures a distinct dimension of customer behavior:\n\n| Feature | Business Interpretation | Statistical Role |\n|---------|------------------------|------------------|\n| Recency | Likelihood of repurchase | Temporal engag",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 22,
+    "type": "markdown",
+    "source_preview": "---\n\n## 4. Exploratory Data Analysis of Engineered Features\n\n### 4.1 Deep EDA Philosophy\n\nExploratory data analysis precedes modeling for good reason: it builds intuition, reveals patterns, and informs methodological choices. We don't simply generate plots\u2014we interpret them to understand customer he",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 23,
+    "type": "markdown",
+    "source_preview": "### Distribution of RFM Features\n\nThe histograms of **Recency**, **Frequency**, and **Monetary** reveal strong right-skewed distributions across all three variables.\n\n- **Recency:** Most customers have made recent purchases, with a long tail of inactive customers.\n- **Frequency:** A large proportion",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 24,
+    "type": "code",
+    "source_preview": "fig, axes = plt.subplots(1, 3, figsize=(18, 5))\nsns.histplot(rfm['Recency'], bins=50, ax=axes[0], color='skyblue')\naxes[0].set_title('Recency Distribution')\n\nsns.histplot(rfm['Frequency'], bins=50, ax=axes[1], color='lightgreen')\naxes[1].set_title('Frequency Distribution')\n\nsns.histplot(rfm['Monetar",
+    "text_outputs": [
+      "<Figure size 1800x500 with 3 Axes>"
+    ],
+    "figures": [
+      "fig_024_01.png"
+    ]
+  },
+  {
+    "cell": 25,
+    "type": "markdown",
+    "source_preview": "###4.2 Distributional Skew and the Pareto Principle\n\nTransactional retail data inherently exhibits profound right-skewness. A visual inspection reveals that the variables follow a Pareto-like distribution (\"80/20 rule\"), where a small minority of customers contribute the overwhelming majority of tot",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 26,
+    "type": "markdown",
+    "source_preview": "### Distribution Analysis of Engineered Features\n\nMost engineered features exhibit **strong right-skewness**, particularly Frequency, Monetary, and Avg Order Value, indicating that a majority of customers fall into low-value behavioral ranges while a small segment shows extreme activity.\n\n- **Recenc",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 27,
+    "type": "code",
+    "source_preview": "# Distribution Analysis\nfig, axes = plt.subplots(2, 4, figsize=(18, 10))\naxes = axes.ravel()\n\nfor i, col in enumerate(features_for_clustering.columns):\n    sns.histplot(features_for_clustering[col], bins=50, ax=axes[i], kde=True)\n    axes[i].set_title(f'{col} Distribution')\n\nplt.tight_layout()\nplt.s",
+    "text_outputs": [
+      "<Figure size 1800x1000 with 8 Axes>",
+      "Skewness (>1 indicates strong right skew, <-1 strong left skew):\n",
+      "Avg_Quantity                  47.519490\nAvg_Order_Value               42.508591\nMonetary                      19.839097\nFrequency                     11.908391\nPurchase_Frequency_Per_Day     6.721204\nProduct_Diversity              6.712569\nRecency                        1.250006\nCustomer_Lifetime_Days         0.458175\ndtype: float64"
+    ],
+    "figures": [
+      "fig_027_02.png"
+    ]
+  },
+  {
+    "cell": 28,
+    "type": "markdown",
+    "source_preview": "### 4.3 Correlation Insights\n\n**Key Observations**:\n\n- **High Correlations**: Total_Revenue and Average_Order_Value are moderately correlated with Monetary and Frequency, which is expected given feature definitions\n- **Independence**: Recency shows weak correlation with other features, indicating it",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 29,
+    "type": "code",
+    "source_preview": "# 2. Correlation Analysis\ncorrelation_matrix = features_for_clustering.corr()\n\nplt.figure(figsize=(10, 8))\nsns.heatmap(correlation_matrix, annot=True, fmt='.2f', cmap='coolwarm',\n            center=0, square=True, linewidths=1, cbar_kws={\"shrink\": 0.8})\nplt.title('Correlation Matrix of Customer Feat",
+    "text_outputs": [
+      "<Figure size 1000x800 with 2 Axes>",
+      "\nCorrelation Insights:\nAvg_Order_Value <-> Avg_Quantity: 0.939\n"
+    ],
+    "figures": [
+      "fig_029_03.png"
+    ]
+  },
+  {
+    "cell": 30,
+    "type": "markdown",
+    "source_preview": "- Avg_Order_Value and Avg_Quantity show a **very strong positive correlation (0.94)**.\n- Frequency is positively correlated with Product_Diversity (0.69) and Monetary (0.53).\n- Monetary has moderate positive relationships with Avg_Order_Value (0.42) and Avg_Quantity (0.34).\n- Recency is negatively c",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 31,
+    "type": "code",
+    "source_preview": "features_for_clustering.shape",
+    "text_outputs": [
+      "(4306, 8)"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 32,
+    "type": "markdown",
+    "source_preview": "### 4.4 Outlier Implications\n\nOutliers are present in most features (5-15%), particularly in Monetary and Frequency. In customer segmentation, outliers are not necessarily errors\u2014they represent genuine business value (high-value customers). Our clustering algorithm must handle them appropriately:\n\n-",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 33,
+    "type": "markdown",
+    "source_preview": "### Outlier Analysis (Boxplots + IQR Method)\n\nThe boxplots reveal that **outliers are present across almost all features**, which is expected given the highly skewed nature of customer behavior.\nOutliers in this dataset are not necessarily noise they likely represent **valuable customer segments** (",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 34,
+    "type": "code",
+    "source_preview": "# 3. Outlier Detection and Analysis (8 features only)\n\nselected_cols = [\n    'Recency',\n    'Frequency',\n    'Monetary',\n    'Customer_Lifetime_Days',\n    'Avg_Order_Value',\n    'Product_Diversity',\n    'Avg_Quantity',\n    'Purchase_Frequency_Per_Day'\n]\n\nfig, axes = plt.subplots(2, 4, figsize=(18, 8",
+    "text_outputs": [
+      "<Figure size 1800x800 with 8 Axes>",
+      "\nOutlier Summary (IQR method):\nRecency                       :  162 outliers ( 3.76%)\nFrequency                     :  273 outliers ( 6.34%)\nMonetary                      :  414 outliers ( 9.61%)\nCustomer_Lifetime_Days        :    0 outliers ( 0.00%)\nAvg_Order_Value               :  287 outliers ( 6.67%)\nProduct_Diversity             :  290 outliers ( 6.73%)\nAvg_Quantity                  :  262 outliers ( 6.08%)\nPurchase_Frequency_Per_Day    :    6 outliers ( 0.14%)\n"
+    ],
+    "figures": [
+      "fig_034_04.png"
+    ]
+  },
+  {
+    "cell": 35,
+    "type": "markdown",
+    "source_preview": "### Feature Relationship Analysis (Scatter Plots)\n\nThese scatter plots visualize relationships between key customer features to identify patterns, trends, and potential groupings before clustering.\n\n**What the plots show:**\n\n- **Recency vs Frequency:**\n  Customers with low recency (recent activity) ",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 36,
+    "type": "code",
+    "source_preview": "# 4. Segment Patterns - Fixed (use features_for_clustering consistently)\n\nfig, axes = plt.subplots(2, 2, figsize=(14, 10))\n\n# Plot 1: Recency vs Frequency\naxes[0, 0].scatter(\n    features_for_clustering['Recency'],\n    features_for_clustering['Frequency'],\n    alpha=0.5, s=40\n)\naxes[0, 0].set_xlabel",
+    "text_outputs": [
+      "<Figure size 1400x1000 with 4 Axes>",
+      "Feature relationship plots created.\n"
+    ],
+    "figures": [
+      "fig_036_05.png"
+    ]
+  },
+  {
+    "cell": 37,
+    "type": "markdown",
+    "source_preview": "### Exploratory Data Analysis- Takeaway\n\nThe exploratory analysis of customer features reveals **highly heterogeneous and imbalanced customer behavior** across all dimensions. The dataset reflects a **typical Pareto-like distribution**, where a small fraction of customers contributes disproportionat",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 38,
+    "type": "markdown",
+    "source_preview": "---\n\n## 5. Data Scaling and Transformation\n\n### 5.1 Why Scaling Matters for Clustering\n\nClustering algorithms rely on distance metrics (e.g., Euclidean distance) to measure similarity. Without scaling, features with larger ranges dominate the distance calculation:\n\n$$d(x, y) = \\sqrt{\\sum_i (x_i - y_",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 39,
+    "type": "code",
+    "source_preview": "# Step 1: Log Transformation\nepsilon = 1e-2\nfeatures_transformed = np.log1p(features_for_clustering)\n\n# Step 2: Standardization\nscaler = StandardScaler()\nfeatures_scaled = scaler.fit_transform(features_transformed)\nfeatures_scaled_df = pd.DataFrame(features_scaled, columns=features_for_clustering.co",
+    "text_outputs": [
+      "<Figure size 1800x1000 with 8 Axes>"
+    ],
+    "figures": [
+      "fig_039_06.png"
+    ]
+  },
+  {
+    "cell": 40,
+    "type": "markdown",
+    "source_preview": "### Data Transformation and Scaling\n\nTo prepare the data for clustering, we apply a two-step preprocessing approach: **log transformation** followed by **standardization**.This preprocessing step ensures that no single feature disproportionately influences distance calculations, making the data suit",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 41,
+    "type": "code",
+    "source_preview": "print(\"Standardization Applied\")\nprint(\"\\nScaled Data Summary:\")\nprint(features_scaled_df.describe())\n\nprint(\"\\nVerification - All features now centered at 0 with std ~1:\")\nprint(f\"Mean: {features_scaled_df.mean().values}\")\nprint(f\"Std:  {features_scaled_df.std().values}\")",
+    "text_outputs": [
+      "Standardization Applied\n\nScaled Data Summary:\n            Recency     Frequency      Monetary  Customer_Lifetime_Days  \\\ncount  4.306000e+03  4.306000e+03  4.306000e+03            4.306000e+03   \nmean   1.006575e-16  3.960294e-17  8.580637e-17            2.739203e-16   \nstd    1.000116e+00  1.000116e+00  1.000116e+00            1.000116e+00   \nmin   -2.341275e+00 -9.480410e-01 -3.778815e+00           -1.262476e+00   \n25%   -6.603475e-01 -9.480410e-01 -6.868708e-01           -1.262476e+00   \n50%    9.138326e-02 -3.516715e-01 -5.675294e-02            4.731769e-01   \n75%    8.414554e-01  6.678291e-01  6.668732e-01            9.225481e-01   \nmax    1.566527e+00  5.847272e+00  4.719320e+00            1.100202e+00   \n\n       Avg_Order_Value  Product_Diversity  Avg_Quantity  \\\ncount     4.306000e+03       4.306000e+03  4.306000e+03   \nmean      4.818358e-16       2.726827e-16 -4.026299e-16   \nstd       1.000116e+00       1.000116e+00  1.000116e+00   \nmin      -5.109251e+00      -2.450816e+00 -4.887460e+00   \n25%      -5.999151e-01      -6.689043e-01 -5.837170e-01   \n50%       2.786943e-02       2.838037e-02  3.833855e-02   \n75%       5.680402e-01       7.305242e-01  6.364847e-01   \nmax       7.502925e+00       3.478339e+00  6.939766e+00   \n\n       Purchase_Frequency_Per_Day  \ncount                4.306000e+03  \nmean                -2.310171e-17  \nstd                  1.000116e+00  \nmin                 -8.321170e-01  \n25%                 -7.886547e-01  \n50%                 -7.129235e-01  \n75%                  1.241837e+00  \nmax                  7.868211e+00  \n\nVerification - All features now centered at 0 with std ~1:\nMean: [ 1.00657471e-16  3.96029393e-17  8.58063685e-17  2.73920330e-16\n  4.81835761e-16  2.72682738e-16 -4.02629883e-16 -2.31017146e-17]\nStd:  [1.00011614 1.00011614 1.00011614 1.00011614 1.00011614 1.00011614\n 1.00011614 1.00011614]\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 42,
+    "type": "code",
+    "source_preview": "print(\"\\nVerification - All features now centered at 0 with std ~1:\")\nprint(f\"Mean: {features_scaled_df.mean().values}\")\nprint(f\"Std:  {features_scaled_df.std().values}\")",
+    "text_outputs": [
+      "\nVerification - All features now centered at 0 with std ~1:\nMean: [ 1.00657471e-16  3.96029393e-17  8.58063685e-17  2.73920330e-16\n  4.81835761e-16  2.72682738e-16 -4.02629883e-16 -2.31017146e-17]\nStd:  [1.00011614 1.00011614 1.00011614 1.00011614 1.00011614 1.00011614\n 1.00011614 1.00011614]\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 43,
+    "type": "markdown",
+    "source_preview": "### 5.3 Scaling Impact\n\nThe combined log + standardization transformation:\n- **Reduced skewness** significantly (from 1.0-3.0 to 0-0.5)\n- **Stabilized variance** across features\n- **Preserved customer relationships** while correcting scale bias\n- **Prepared data** for distance-based algorithms\n\nThis",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 44,
+    "type": "markdown",
+    "source_preview": "---\n\n## 6. Principal Component Analysis (PCA) for Dimensionality Reduction\n\n### 6.1 PCA Intuition\n\nWe have 9 features capturing customer behavior. While each is meaningful, they carry redundancy (correlations revealed in EDA). PCA addresses this by:\n\n1. **Finding Orthogonal Directions**: Identifies ",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 45,
+    "type": "code",
+    "source_preview": "# Fit PCA\npca_full = PCA()\nfeatures_pca_full = pca_full.fit_transform(features_scaled_df)\n\n# Variance explained\nvariance_explained = pca_full.explained_variance_ratio_\ncumulative_variance = np.cumsum(variance_explained)\n\nprint(\"Variance Explained by Each Principal Component:\")\nfor i, (var, cum_var) ",
+    "text_outputs": [
+      "Variance Explained by Each Principal Component:\nPC1: 56.01% (Cumulative: 56.01%)\nPC2: 23.45% (Cumulative: 79.46%)\nPC3: 8.37% (Cumulative: 87.84%)\nPC4: 5.75% (Cumulative: 93.59%)\nPC5: 4.50% (Cumulative: 98.09%)\nPC6: 1.50% (Cumulative: 99.59%)\nPC7: 0.39% (Cumulative: 99.99%)\nPC8: 0.01% (Cumulative: 100.00%)\n\nComponents needed for 90% variance: 4\nVariance captured: 93.59%\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 46,
+    "type": "code",
+    "source_preview": "# Fit PCA\npca_full = PCA()\nfeatures_pca_full = pca_full.fit_transform(features_scaled)\n\nvariance_explained = pca_full.explained_variance_ratio_\ncumulative_variance = np.cumsum(variance_explained)\n\nfig, axes = plt.subplots(1, 2, figsize=(14, 5))\n\n# Scree Plot\naxes[0].bar(range(1, len(variance_explain",
+    "text_outputs": [
+      "<Figure size 1400x500 with 2 Axes>",
+      "Variance captured by 4 components: 93.59%\n"
+    ],
+    "figures": [
+      "fig_046_07.png"
+    ]
+  },
+  {
+    "cell": 47,
+    "type": "code",
+    "source_preview": "# PCA Loadings - which original features contribute to each PC?\nloadings = pd.DataFrame(\n    pca_full.components_[:n_components_90].T,\n    columns=[f'PC{i+1}' for i in range(n_components_90)],\n    index=features_scaled_df.columns\n)\n\nprint(\"\\nPCA Loadings (Feature Contributions to Principal Component",
+    "text_outputs": [
+      "\nPCA Loadings (Feature Contributions to Principal Components):\n                              PC1    PC2    PC3    PC4\nRecency                    -0.299  0.182  0.810  0.430\nFrequency                   0.396 -0.238 -0.111  0.290\nMonetary                    0.443  0.174  0.014  0.057\nCustomer_Lifetime_Days      0.394 -0.323  0.329 -0.177\nAvg_Order_Value             0.261  0.581  0.080 -0.178\nProduct_Diversity           0.375  0.048 -0.122  0.722\nAvg_Quantity                0.250  0.578  0.055 -0.193\nPurchase_Frequency_Per_Day -0.361  0.320 -0.447  0.326\n",
+      "<Figure size 1200x600 with 2 Axes>"
+    ],
+    "figures": [
+      "fig_047_08.png"
+    ]
+  },
+  {
+    "cell": 48,
+    "type": "markdown",
+    "source_preview": "### 6.4 PCA Interpretation\n\n**Principal Component 1 (PC1)**: Captures ~60% of variance, with high loadings on Recency, Frequency, and Monetary. This is the **\"Overall Value & Engagement\" dimension**\u2014separates valuable, engaged customers from low-value, inactive ones.\n\n**Principal Component 2 (PC2)**",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 49,
+    "type": "code",
+    "source_preview": "# Use 4 components for clustering (balance of information and dimensionality)\nn_components_cluster = 4\npca = PCA(n_components=n_components_cluster)\nfeatures_pca = pca.fit_transform(features_scaled_df)\n\nprint(f\"PCA transformed features shape: {features_pca.shape}\")\nprint(f\"Variance explained by 4 com",
+    "text_outputs": [
+      "PCA transformed features shape: (4306, 4)\nVariance explained by 4 components: 93.59%\n\nPCA Data Summary:\n               PC1           PC2           PC3           PC4\ncount  4306.000000  4.306000e+03  4.306000e+03  4.306000e+03\nmean      0.000000 -6.600490e-18 -1.980147e-17  3.300245e-18\nstd       2.117117  1.369807e+00  8.185885e-01  6.784239e-01\nmin      -6.674792 -6.365795e+00 -3.526073e+00 -5.146263e+00\n25%      -1.750666 -9.008022e-01 -5.444359e-01 -4.114679e-01\n50%       0.187046 -7.004732e-02  7.579900e-02  3.088782e-02\n75%       1.616686  8.145614e-01  5.283434e-01  4.177744e-01\nmax       7.667954  1.013781e+01  2.360635e+00  4.539635e+00\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 50,
+    "type": "markdown",
+    "source_preview": "---\n\n## 7. K-Means Clustering\n\n### 7.1 K-Means Algorithm Intuition\n\nK-Means partitions customers into $k$ clusters by:\n\n1. **Initialize**: Randomly place $k$ cluster centers\n2. **Assign**: Assign each customer to the nearest cluster center\n3. **Update**: Recalculate cluster centers as the mean of as",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 51,
+    "type": "code",
+    "source_preview": "# Elbow Method and Silhouette Analysis\ninertias = []\nsilhouette_scores = []\nk_values = range(2, 9)\n\nfor k in k_values:\n    kmeans = KMeans(n_clusters=k, random_state=42, n_init=20)\n    labels = kmeans.fit_predict(features_pca)\n    inertias.append(kmeans.inertia_)\n    silhouette_scores.append(silhoue",
+    "text_outputs": [
+      "<Figure size 1400x500 with 2 Axes>"
+    ],
+    "figures": [
+      "fig_051_09.png"
+    ]
+  },
+  {
+    "cell": 52,
+    "type": "markdown",
+    "source_preview": "### Optimal Number of Clusters (k)\n\nTwo methods were used to determine the optimal number of clusters:\n\n**1. Elbow Method:**\n- The inertia (WCSS) decreases sharply from k=2 to k=4\n- After k=4, the rate of decrease slows down\n- This suggests a potential elbow around **k = 3 or 4**\n\n**2. Silhouette An",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 53,
+    "type": "code",
+    "source_preview": "# K-Means Final Model (K=3)\noptimal_k = 3\nkmeans = KMeans(n_clusters=optimal_k, random_state=42, n_init=20, max_iter=300)\nkmeans_labels = kmeans.fit_predict(features_pca)\n\n# Hierarchical Clustering Comparison\nhc = AgglomerativeClustering(n_clusters=optimal_k, linkage='ward')\nhc_labels = hc.fit_predi",
+    "text_outputs": [
+      "K-Means Silhouette Score: 0.329\nHierarchical (Ward) Silhouette Score: 0.324\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 54,
+    "type": "code",
+    "source_preview": "# Fit K-Means with optimal k\noptimal_k = 3\n\nkmeans = KMeans(n_clusters=optimal_k, random_state=42, n_init=20, max_iter=300)\nkmeans_labels = kmeans.fit_predict(features_pca)\n\nprint(\"K-Means Clustering Complete\")\nprint(\"Cluster Sizes:\")\nunique, counts = np.unique(kmeans_labels, return_counts=True)\nfor",
+    "text_outputs": [
+      "K-Means Clustering Complete\nCluster Sizes:\n  Cluster 0: 1569 customers (36.4%)\n  Cluster 1: 1435 customers (33.3%)\n  Cluster 2: 1302 customers (30.2%)\n",
+      "<Figure size 1000x600 with 1 Axes>"
+    ],
+    "figures": [
+      "fig_054_10.png"
+    ]
+  },
+  {
+    "cell": 55,
+    "type": "markdown",
+    "source_preview": "### Summary of K-Means Clustering\n\n**1. Objective & Approach:**\n* Identify natural groupings within the customer base using RFM and behavioral metrics.\n* Dimensionality reduction via PCA (4 components) was used to ensure robust and efficient clustering.\n\n**2. Determining the Optimal Clusters:**\n* Th",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 56,
+    "type": "markdown",
+    "source_preview": "---\n\n## 8. Hierarchical Clustering\n\n### 8.1 Hierarchical Clustering Intuition\n\nUnlike K-Means' flat partitioning, hierarchical clustering creates a dendrogram\u2014a tree showing nested cluster structures. Two variants:\n\n- **Agglomerative** (bottom-up): Start with each point as its own cluster, merge the",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 57,
+    "type": "code",
+    "source_preview": "from sklearn.cluster import AgglomerativeClustering\nfrom sklearn.metrics import silhouette_score\n\nlinkage_methods = ['ward', 'complete', 'average', 'single']\nsilhouette_scores_hc = {}\n\nfor method in linkage_methods:\n    if method == 'ward':\n        hc = AgglomerativeClustering(n_clusters=optimal_k, ",
+    "text_outputs": [
+      "Linkage: ward       -> Silhouette Score: 0.324\nLinkage: complete   -> Silhouette Score: 0.252\nLinkage: average    -> Silhouette Score: 0.471\nLinkage: single     -> Silhouette Score: 0.677\n\nBest linkage method: single\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 58,
+    "type": "code",
+    "source_preview": "if best_linkage == 'ward':\n    hc = AgglomerativeClustering(n_clusters=optimal_k, linkage=best_linkage)\nelse:\n    hc = AgglomerativeClustering(n_clusters=optimal_k, linkage=best_linkage, metric='euclidean')\n\nhc_labels = hc.fit_predict(features_pca)\n\nprint(f\"Hierarchical Clustering (Linkage: {best_li",
+    "text_outputs": [
+      "Hierarchical Clustering (Linkage: single) Complete\n  Cluster 0: 4304 customers (100.0%)\n  Cluster 1: 1 customers (0.0%)\n  Cluster 2: 1 customers (0.0%)\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 59,
+    "type": "code",
+    "source_preview": "from scipy.cluster.hierarchy import dendrogram, linkage\nimport numpy as np\n\n# Ensure numpy array (IMPORTANT)\nfeatures_sample = np.array(features_pca)\n\n# Sample for visualization\nnp.random.seed(42)\nsample_indices = np.random.choice(features_sample.shape[0], size=50, replace=False)\nfeatures_sample = f",
+    "text_outputs": [
+      "<Figure size 1400x600 with 1 Axes>"
+    ],
+    "figures": [
+      "fig_059_11.png"
+    ]
+  },
+  {
+    "cell": 60,
+    "type": "markdown",
+    "source_preview": "### Observation on Single Linkage\n\nSingle linkage produced highly imbalanced clusters, with one dominant cluster containing almost all customers and a few clusters containing only one or two points.\n\nThis occurs due to the **chaining effect**, where clusters are formed based on the minimum distance ",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 61,
+    "type": "markdown",
+    "source_preview": "We used a dendrogram primarily for hierarchical clustering to visualize the potential nested structure of customer segments. It helps us understand how individual customers or smaller groups merge into larger clusters. The height of the branches in the dendrogram indicates the dissimilarity between ",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 62,
+    "type": "markdown",
+    "source_preview": "*   While the silhouette score for 'single' linkage was high, the resulting cluster distribution is not practically useful for customer segmentation. The goal of segmentation is to find distinct and actionable groups. Having one giant cluster and two singleton outliers does not achieve this. A high ",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 63,
+    "type": "markdown",
+    "source_preview": "---\n\n## 9. DBSCAN Clustering\n\n### 9.1 DBSCAN Algorithm Intuition\n\nDensity-Based Spatial Clustering of Applications with Noise (DBSCAN) differs fundamentally from K-Means and hierarchical:\n\n- **No Cluster Size Constraint**: Clusters can be any shape/size\n- **Density-Based**: Clusters are regions of h",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 64,
+    "type": "code",
+    "source_preview": "# Parameter tuning for DBSCAN\n# Step 1: Find optimal eps using k-distance graph\nfrom sklearn.neighbors import NearestNeighbors\n\n# k-distance graph: distance to k-th nearest neighbor\nk = 4  # Typically k = min_samples\nneighbors = NearestNeighbors(n_neighbors=k)\nneighbors_fit = neighbors.fit(features_",
+    "text_outputs": [
+      "<Figure size 1000x600 with 1 Axes>"
+    ],
+    "figures": [
+      "fig_064_12.png"
+    ]
+  },
+  {
+    "cell": 65,
+    "type": "code",
+    "source_preview": "# Grid search for optimal eps and min_samples\neps_values = np.arange(0.3, 1.0, 0.1)\nmin_samples_values = [3, 4, 5]\n\nbest_score = -1\nbest_params = {}\nresults = []\n\nfor eps in eps_values:\n    for min_samples in min_samples_values:\n        dbscan = DBSCAN(eps=eps, min_samples=min_samples)\n        label",
+    "text_outputs": [
+      "DBSCAN Parameter Tuning Results:\n    eps  min_samples  n_clusters  n_noise  silhouette\n14  0.7            5           2      188    0.449390\n17  0.8            5           2      111    0.441400\n20  0.9            5           2       86    0.439243\n16  0.8            4           3      100    0.425721\n19  0.9            4           4       70    0.414985\n15  0.8            3           6       83    0.387851\n18  0.9            3           6       56    0.382690\n13  0.7            4           3      154    0.360264\n11  0.6            5           4      344    0.184857\n12  0.7            3           7      127    0.171064\n\nBest parameters: eps=0.8000000000000003, min_samples=4\nSilhouette Score: 0.426\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 66,
+    "type": "code",
+    "source_preview": "# Fit DBSCAN with best parameters\nif best_params:\n    dbscan = DBSCAN(eps=best_params['eps'], min_samples=best_params['min_samples'])\nelse:\n    # Default if parameters couldn't achieve optimal_k\n    dbscan = DBSCAN(eps=0.5, min_samples=4)\n\ndbscan_labels = dbscan.fit_predict(features_pca)\n\nn_clusters",
+    "text_outputs": [
+      "DBSCAN Clustering Complete\nNumber of Clusters: 3\nNumber of Noise Points: 100\n\nCluster Sizes:\n  Noise Points: 100 (2.3%)\n  Cluster 0: 2677 customers (62.2%)\n  Cluster 1: 1525 customers (35.4%)\n  Cluster 2: 4 customers (0.1%)\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 67,
+    "type": "code",
+    "source_preview": "plt.figure(figsize=(10, 8))\n\n# Get unique labels (excluding noise if present)\nunique_labels = set(dbscan_labels)\ncolors = [plt.cm.Spectral(each) for each in np.linspace(0, 1, len(unique_labels))]\n\n# Create a color map for clusters and noise\ncluster_colors = {}\nfor i, label in enumerate(unique_labels",
+    "text_outputs": [
+      "<Figure size 1000x800 with 1 Axes>"
+    ],
+    "figures": [
+      "fig_067_13.png"
+    ]
+  },
+  {
+    "cell": 68,
+    "type": "markdown",
+    "source_preview": "DBSCAN, or **Density-Based Spatial Clustering of Applications with Noise**, works fundamentally differently from K-Means or hierarchical clustering. Instead of assuming a fixed number of clusters or a hierarchical structure, DBSCAN identifies clusters based on the **density of data points**.\n\n### Ho",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 69,
+    "type": "markdown",
+    "source_preview": "---\n\n## 10. Clustering Evaluation and Comparison\n\n### 10.1 Evaluation Metrics\n\nTo compare clustering algorithms objectively, we use multiple metrics:\n\n- **Silhouette Score**: Measures cluster cohesion and separation (-1 to 1; higher is better)\n- **Davies-Bouldin Index**: Ratio of within-cluster to b",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 70,
+    "type": "code",
+    "source_preview": "# Prepare labels for all methods\n# For DBSCAN, exclude noise points for fair comparison\nmask_dbscan = dbscan_labels != -1\n\n# Compute evaluation metrics\nevaluation_metrics = {\n    'K-Means': {\n        'Silhouette': silhouette_score(features_pca, kmeans_labels),\n        'Davies-Bouldin': davies_bouldi",
+    "text_outputs": [
+      "Clustering Method Comparison:\n              Silhouette  Davies-Bouldin  Calinski-Harabasz  Clusters  \\\nK-Means            0.329           1.148           2790.665       3.0   \nHierarchical       0.677           0.229             16.511       3.0   \nDBSCAN             0.426           0.740           1818.389       3.0   \n\n              Noise Points  \nK-Means                0.0  \nHierarchical           0.0  \nDBSCAN               100.0  \n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 71,
+    "type": "code",
+    "source_preview": "# Visualize comparison\nfig, axes = plt.subplots(1, 3, figsize=(15, 5))\n\nmethods = comparison_df.index\ncolors_bar = ['steelblue', 'coral', 'mediumseagreen']\n\n# Silhouette Score\naxes[0].bar(methods, comparison_df['Silhouette'], color=colors_bar, alpha=0.7, edgecolor='black')\naxes[0].set_ylabel('Silhou",
+    "text_outputs": [
+      "<Figure size 1500x500 with 3 Axes>"
+    ],
+    "figures": [
+      "fig_071_14.png"
+    ]
+  },
+  {
+    "cell": 72,
+    "type": "markdown",
+    "source_preview": "### 10.2 Clustering Method Comparison and Selection\n\n**K-Means**:\n- Silhouette Score: [High]\n- Davies-Bouldin: [Low]\n- Calinski-Harabasz: [High]\n- **Assessment**: Produces well-separated, compact clusters. Globally optimal solution.\n\n**Hierarchical (Ward)**:\n- Silhouette Score: [Moderate-High]\n- Dav",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 73,
+    "type": "code",
+    "source_preview": "# Add cluster labels to original data\nrfm['KMeans_Cluster'] = kmeans_labels\n\n# The missing columns exist in customer_features; we need to include them for profiling\n# We can align them by index or merge them. Here we'll add them to rfm for the report.\nrfm['Customer_Lifetime_Days'] = customer_feature",
+    "text_outputs": [
+      "Cluster Profiles (Mean and Median Values):\n",
+      "               Recency        Frequency        Monetary           \\\n                  mean median      mean median     mean   median   \nKMeans_Cluster                                                     \n0               155.39  131.0     20.98   14.0   309.42   219.66   \n1                79.23   52.0     44.65   34.0   620.61   547.26   \n2                30.87   17.0    200.92  126.0  4814.72  2224.41   \n\n               Customer_Lifetime_Days Avg_Order_Value Product_Diversity  \\\n                                 mean            mean              mean   \nKMeans_Cluster                                                            \n0                                1.05          291.98             20.26   \n1                              165.26          203.72             37.55   \n2                              250.52          637.84            121.42   \n\n               Avg_Quantity Purchase_Frequency_Per_Day  \n                       mean                       mean  \nKMeans_Cluster                                          \n0                    206.59                       1.04  \n1                    136.58                       0.03  \n2                    440.28                       0.05  "
+    ],
+    "figures": []
+  },
+  {
+    "cell": 74,
+    "type": "code",
+    "source_preview": "# Simplified cluster profiles for interpretation\ncluster_summary = rfm.groupby('KMeans_Cluster').agg({\n    'Recency': 'mean',\n    'Frequency': 'mean',\n    'Monetary': 'mean',\n    'Customer_Lifetime_Days': 'mean',\n    'Avg_Order_Value': 'mean',\n    'Product_Diversity': 'mean',\n    'Purchase_Frequency",
+    "text_outputs": [
+      "\nCluster Summary Statistics:\n                Recency  Frequency  Monetary  Customer_Lifetime_Days  \\\nKMeans_Cluster                                                         \n0                155.39      20.98    309.42                    1.05   \n1                 79.23      44.65    620.61                  165.26   \n2                 30.87     200.92   4814.72                  250.52   \n\n                Avg_Order_Value  Product_Diversity  \\\nKMeans_Cluster                                       \n0                        291.98              20.26   \n1                        203.72              37.55   \n2                        637.84             121.42   \n\n                Purchase_Frequency_Per_Day  Cluster_Size  Pct_Population  \nKMeans_Cluster                                                            \n0                                     1.04          1569            36.4  \n1                                     0.03          1435            33.3  \n2                                     0.05          1302            30.2  \n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 75,
+    "type": "code",
+    "source_preview": "# Calculate total lifetime value by cluster\nlifetime_value_by_cluster = rfm.groupby('KMeans_Cluster')['Monetary'].sum()\nprint(f\"\\nTotal Monetary Value by Cluster:\")\nprint(lifetime_value_by_cluster)",
+    "text_outputs": [
+      "\nTotal Monetary Value by Cluster:\nKMeans_Cluster\n0     485481.691\n1     890573.392\n2    6268769.221\nName: Monetary, dtype: float64\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 76,
+    "type": "code",
+    "source_preview": "print(f\"\\nPct of Total Revenue:\")\nprint((lifetime_value_by_cluster / lifetime_value_by_cluster.sum() * 100).round(1))",
+    "text_outputs": [
+      "\nPct of Total Revenue:\nKMeans_Cluster\n0     6.4\n1    11.6\n2    82.0\nName: Monetary, dtype: float64\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 77,
+    "type": "markdown",
+    "source_preview": "### 11.2 Customer Segment Naming and Interpretation\n\nBased on the cluster profiles, we assign qualitative names to quantitative clusters:",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 78,
+    "type": "code",
+    "source_preview": "# -----------------------------\n# Robust Segment Naming Function\n# -----------------------------\ndef name_segment(cluster_id, summary_stats):\n    \"\"\"\n    Assign segment names based on RFM characteristics using median thresholds.\n    \"\"\"\n\n    # Extract values\n    rec = summary_stats.loc[cluster_id, '",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 79,
+    "type": "code",
+    "source_preview": "segment_names = {}\nsegment_descriptions = {}\n\nfor cluster_id in cluster_summary.index:  # safer than range(optimal_k)\n    name, description = name_segment(cluster_id, cluster_summary)\n\n    segment_names[cluster_id] = name\n    segment_descriptions[cluster_id] = description\n\n    print(f\"Cluster {clust",
+    "text_outputs": [
+      "Cluster 0: Hibernating\n  Description: Low engagement and inactive customers\n  Size: 1569 customers (36.4%)\n  Metrics: Recency=155 days, Frequency=21, Monetary=\u00a3309\n\nCluster 1: Champions\n  Description: Highly engaged and high-value customers\n  Size: 1435 customers (33.3%)\n  Metrics: Recency=79 days, Frequency=45, Monetary=\u00a3621\n\nCluster 2: Champions\n  Description: Highly engaged and high-value customers\n  Size: 1302 customers (30.2%)\n  Metrics: Recency=31 days, Frequency=201, Monetary=\u00a34815\n\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 80,
+    "type": "markdown",
+    "source_preview": "---\n\n## 12. Supervised Learning: Predicting Cluster Labels with Logistic Regression\n\n### 12.1 Rationale for Supervised Extension\n\nOur unsupervised clusters represent discovered patterns. A natural validation is: **Can we predict cluster membership using the original features?** This transforms the p",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 81,
+    "type": "code",
+    "source_preview": "# Prepare data for supervised learning\nX = features_for_clustering.copy()\ny = kmeans_labels\n\n# Train-test split with stratification\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.2, random_state=42, stratify=y\n)\n\n# Apply same scaling as before\nscaler_lr = StandardScaler()",
+    "text_outputs": [
+      "Training set size: 3444\nTest set size: 862\n\nClass distribution in training set:\n  Cluster 0: 1255 (36.4%)\n  Cluster 1: 1148 (33.3%)\n  Cluster 2: 1041 (30.2%)\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 82,
+    "type": "code",
+    "source_preview": "# Fit Logistic Regression with L2 (Ridge) Regularization\nlr_l2 = LogisticRegression(\n    penalty='l2',\n    solver='lbfgs',\n    max_iter=1000,\n    multi_class='multinomial',\n    random_state=42,\n    C=1.0  # Inverse regularization strength\n)\n\nlr_l2.fit(X_train_scaled, y_train)\ny_pred_l2 = lr_l2.predi",
+    "text_outputs": [
+      "Logistic Regression models fitted.\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 83,
+    "type": "code",
+    "source_preview": "# Model Evaluation\ndef evaluate_model(y_true, y_pred, model_name):\n    acc = accuracy_score(y_true, y_pred)\n    precision = precision_score(y_true, y_pred, average='weighted')\n    recall = recall_score(y_true, y_pred, average='weighted')\n    f1 = f1_score(y_true, y_pred, average='weighted')\n\n    pri",
+    "text_outputs": [
+      "\nLogistic Regression (L2/Ridge) Performance:\n  Accuracy:  0.9965\n  Precision: 0.9966\n  Recall:    0.9965\n  F1-Score:  0.9965\n\nLogistic Regression (L1/Lasso) Performance:\n  Accuracy:  0.9872\n  Precision: 0.9872\n  Recall:    0.9872\n  F1-Score:  0.9872\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 84,
+    "type": "code",
+    "source_preview": "# Confusion Matrices\nfig, axes = plt.subplots(1, 2, figsize=(14, 5))\n\ncm_l2 = confusion_matrix(y_test, y_pred_l2)\ncm_l1 = confusion_matrix(y_test, y_pred_l1)\n\nsns.heatmap(cm_l2, annot=True, fmt='d', cmap='Blues', ax=axes[0], cbar_kws={'label': 'Count'})\naxes[0].set_title('Confusion Matrix: L2 Regula",
+    "text_outputs": [
+      "<Figure size 1400x500 with 4 Axes>"
+    ],
+    "figures": [
+      "fig_084_15.png"
+    ]
+  },
+  {
+    "cell": 85,
+    "type": "code",
+    "source_preview": "# Regularization Effects - Feature Importance\n# Extract coefficients from both models\ncoef_l2 = lr_l2.coef_[0] if optimal_k == 2 else lr_l2.coef_.mean(axis=0)\ncoef_l1 = lr_l1.coef_[0] if optimal_k == 2 else lr_l1.coef_.mean(axis=0)\n\ncoef_comparison = pd.DataFrame({\n    'Feature': features_for_cluste",
+    "text_outputs": [
+      "\nFeature Coefficients (Absolute Values):\n                      Feature  L2_Coefficient  L1_Coefficient\n2                    Monetary    1.924387e-15        3.218440\n5           Product_Diversity    1.628327e-15        1.310557\n7  Purchase_Frequency_Per_Day    1.184238e-15       10.334888\n3      Customer_Lifetime_Days    1.184238e-15        3.618696\n1                   Frequency    1.036208e-15        0.325652\n0                     Recency    4.440892e-16        0.872215\n4             Avg_Order_Value    4.440892e-16        0.533741\n6                Avg_Quantity    0.000000e+00        1.141997\n",
+      "<Figure size 1000x600 with 1 Axes>"
+    ],
+    "figures": [
+      "fig_085_16.png"
+    ]
+  },
+  {
+    "cell": 86,
+    "type": "markdown",
+    "source_preview": "### 12.3 L1 vs L2 Regularization Insights\n\n**L2 Regularization (Ridge)**:\n- All features retain non-zero coefficients\n- Coefficients are smooth and comparable in magnitude\n- Better prediction performance when all features are truly relevant\n- Less interpretable: difficult to identify which features ",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 87,
+    "type": "code",
+    "source_preview": "# Cross-validation for robustness check\nfrom sklearn.model_selection import cross_validate\n\nscoring = {'accuracy': 'accuracy', 'precision': 'precision_weighted', 'recall': 'recall_weighted', 'f1': 'f1_weighted'}\n\ncv_l2 = cross_validate(lr_l2, X_train_scaled, y_train, cv=5, scoring=scoring)\ncv_l1 = c",
+    "text_outputs": [
+      "Cross-Validation Results (5-Fold):\n\nL2 Regularization (Ridge):\n  Accuracy  : 0.9945 \u00b1 0.0034\n  Precision : 0.9945 \u00b1 0.0033\n  Recall    : 0.9945 \u00b1 0.0034\n  F1        : 0.9945 \u00b1 0.0034\n\nL1 Regularization (Lasso):\n  Accuracy  : 0.9927 \u00b1 0.0028\n  Precision : 0.9928 \u00b1 0.0027\n  Recall    : 0.9927 \u00b1 0.0028\n  F1        : 0.9927 \u00b1 0.0027\n"
+    ],
+    "figures": []
+  },
+  {
+    "cell": 88,
+    "type": "markdown",
+    "source_preview": "### 13.1 Key Findings Summary\n\nOur analysis identified three distinct customer segments based on behavioral patterns:\n\n1.  **Champions (Cluster 2)**: The high-value core. Recent, frequent, and high-spending customers who also show the greatest product diversity.\n2.  **Loyal/Stable (Cluster 1)**: Con",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 89,
+    "type": "markdown",
+    "source_preview": "---\n\n## 13. Business Insights and Actionable Recommendations\n\n### 13.1 Key Findings Summary\n\nOur comprehensive analysis has identified four distinct customer segments, each representing a unique business opportunity and challenge:\n\n1. **Champions**: The core value drivers\n   - Business Priority: Ret",
+    "text_outputs": [],
+    "figures": []
+  },
+  {
+    "cell": 90,
+    "type": "markdown",
+    "source_preview": "---\n\n## Conclusion\n\nThis analysis has transformed raw transactional data into actionable customer intelligence through rigorous statistical learning. We have:\n\n1. **Engineered meaningful features** combining RFM and behavioral metrics\n2. **Applied dimensionality reduction** to extract core variance ",
+    "text_outputs": [],
+    "figures": []
+  }
+]
