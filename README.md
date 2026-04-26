@@ -2,7 +2,7 @@
 
 A comprehensive statistical learning project analyzing customer behavior through unsupervised clustering techniques applied to the Online Retail dataset.
 
-## 🎯 Project Overview
+## Project Overview
 
 This project undertakes a rigorous statistical analysis of customer behavior through **unsupervised learning techniques** to identify distinct customer segments. The analysis follows a systematic pipeline from raw transactional data to actionable customer segments.
 
@@ -19,7 +19,7 @@ The project implements an end-to-end customer segmentation workflow:
 4. **Evaluation**: Uses statistical metrics to validate segment quality and stability
 5. **Validation**: Employs supervised learning to assess segment robustness
 
-## 📊 Dataset
+## Dataset
 
 **Online Retail Dataset** (UCI Machine Learning Repository)
 - **Period**: 2010-2011 transactions from a UK-based online retailer
@@ -71,7 +71,7 @@ customer-segmentation/
     └── figures/
 ```
 
-## 🔑 Key Findings
+## Key Findings
 
 - Successfully identified distinct customer segments with interpretable characteristics
 - RFM-based features proved effective for segmentation
@@ -79,7 +79,7 @@ customer-segmentation/
 - Segment stability validated through supervised learning classification
 - Actionable insights for targeted marketing and customer retention strategies
 
-## 📋 Requirements
+## Requirements
 
 ```
 pandas
@@ -90,7 +90,7 @@ scikit-learn
 scipy
 ```
 
-## 🚀 How to Run
+## How to Run
 
 1. **Clone the repository**:
    ```bash
@@ -112,25 +112,25 @@ scipy
    - Open `customer segementation.ipynb` in Jupyter Notebook
    - Execute cells sequentially to reproduce the analysis
 
-## 📄 Documentation
+## Documentation
 
 - **Jupyter Notebook**: `customer segementation.ipynb` - Complete analysis with code, visualizations, and detailed commentary
 - **PDF Report**: `STAT654_Final_Report.pdf` - Comprehensive written report with methodology, results, and conclusions
 
-## ✅ Project Status
+## Project Status
 
 **COMPLETED** ✓
 
 This is a finished academic project submitted as the final assignment for STAT 654: Statistical Computing with R and Python.
 
-## 🏫 Course Information
+## Course Information
 
 - **Course**: STAT 654 - Statistical Computing with R and Python
 - **Type**: Final Project
 - **Date Completed**: April 2026
 - **Topics**: Unsupervised Learning, Clustering, Statistical Validation, Feature Engineering
 
-## 🔗 References
+## References
 
 See `customer_segementation/references.bib` for complete bibliography including:
 - Scikit-learn documentation
