@@ -26,7 +26,7 @@ The project implements an end-to-end customer segmentation workflow:
 - **Records**: Transactional-level data spanning multiple customers and products
 - **Key Variables**: Invoice ID, Product codes, Quantities, Prices, Timestamps, Customer IDs, Countries
 
-## 🔬 Methodology
+## Methodology
 
 ### Feature Engineering
 - **RFM Features**: Recency, Frequency, Monetary value per customer
